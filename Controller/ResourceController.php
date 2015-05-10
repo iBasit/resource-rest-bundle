@@ -4,8 +4,10 @@ namespace Symfony\Cmf\Bundle\ResourceRestBundle\Controller;
 
 use Symfony\Cmf\Component\Resource\RepositoryRegistryInterface;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use JMS\Serializer\SerializerInterface;
 use JMS\Serializer\SerializationContext;
+use Puli\Repository\Api\ResourceNotFoundException;
 
 class ResourceController
 {
@@ -32,21 +34,34 @@ class ResourceController
 
     public function resourceAction($repositoryName, $path)
     {
-        $repository = $this->registry->get($repositoryName);
-        $resource = $repository->get('/' . $path);
+        try {
+            $repository = $this->registry->get($repositoryName);
+            $resource = $repository->get('/' . $path);
 
-        $context = SerializationContext::create();
-        $context->enableMaxDepthChecks();
-        $context->setSerializeNull(true);
-        $json = $this->serializer->serialize(
-            $resource,
-            'json',
-            $context
-        );
+            $context = SerializationContext::create();
+            $context->enableMaxDepthChecks();
+            $context->setSerializeNull(true);
+            $json = $this->serializer->serialize(
+                $resource,
+                'json',
+                $context
+            );
 
-        $response = new Response($json);
-        $response->headers->set('Content-Type', 'application/json');
-        
+            $response = new Response($json);
+            $response->headers->set('Content-Type', 'application/json');
+        } catch (\Exception $e) {
+            $code = 500;
+
+            if ($e instanceof ResourceNotFoundException) {
+                $code = 404;
+            }
+
+            $response = new JsonResponse(array(
+                'exception' => get_class($e),
+                'message' => $e->getMessage()
+            ), $code);
+        }
+
         return $response;
     }
 }
